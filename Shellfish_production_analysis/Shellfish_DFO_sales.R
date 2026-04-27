@@ -1,5 +1,6 @@
 #Plotting BC shellfish sales
 
+#Load data ----
 #data from: https://www.dfo-mpo.gc.ca/stats/aqua/aqua-prod-eng.htm
 
 compilation_of_2019_21_seafood_production_data_for_posting_in_bcdc_xlsx <- read_excel("~/Documents/compilation-of-2019-21-seafood-production-data-for-posting-in-bcdc-xlsx.xlsx", 
@@ -9,16 +10,9 @@ Data <- compilation_of_2019_21_seafood_production_data_for_posting_in_bcdc_xlsx
 
 head(Data)
 
-#Packages
-library(tidyr)
-library(dplyr)
-library(ggplot2)
-library(RColorBrewer)
-library(ggsci)
-library(viridis)
+#Packages ----
 #install.packages("ggpmisc")
 library(ggpmisc)
-#library
 #install.packages("dplyr")
 library(dplyr)
 #install.packages("datarium")
@@ -27,6 +21,7 @@ library("datarium")
 library(tidyverse)
 #install.packages("ggpubr")
 library(ggpubr)
+#install.packages("rstatix")
 library(rstatix)
 #install.packages("ggResidpanel")
 library(ggResidpanel)
@@ -36,13 +31,12 @@ library(DHARMa)
 library(lme4)
 #install.packages("fitdistrplus")
 library(fitdistrplus)
-library(ggplot2)
 #install.packages("hrbrthemes")
 library(hrbrthemes)
+#install.packages("tidyr")
 library(tidyr)
 #install.packages("viridis")
 library(viridis)
-library(car)
 #install.packages("agricolae")
 library(agricolae)
 #install.packages("mgcv")
@@ -51,6 +45,8 @@ library(mgcv)
 library(glmmTMB)
 #install.packages("mgcViz")
 library(mgcViz)
+#install.packages("gamm4")
+library(gamm4)
 
 #Add custom theme
 theme.marissa <- function() {
@@ -80,28 +76,45 @@ Data_long <- Data_long %>%
 Data_long$`Species/Product` <- factor(Data_long$`Species/Product`, 
                                       levels = c("Oysters", "Clams", "Mussels", "Scallops", "Other"))
 
+Data_long <- Data_long %>% filter(!is.na(`Species/Product`))
 #make year numeric
 Data_long$Year <- as.numeric(Data_long$Year)
 
+annotations <- data.frame(
+  x = c(1997, 2000, 2020),
+  y = 10000,
+  shape = c(25, 24, 25),
+  color = c("red", "green3", "red")
+)
+
 ggplot(Data_long, aes(x = Year, y = Tonnes, color = `Species/Product`, fill = `Species/Product`, group = `Species/Product`)) +
+  geom_vline(xintercept = c(1997, 2000, 2020), 
+             linetype = "dotted", 
+             color = "black", 
+             linewidth = 0.8) +
   geom_line(linewidth = 1) +
   geom_ribbon(aes(ymin = 0, ymax = Tonnes), alpha = 0.7) +
+  geom_point(data = annotations,
+             aes(x = x, y = y),
+             shape = annotations$shape,
+             color = annotations$color,
+             fill = annotations$color,
+             size = 4,
+             inherit.aes = FALSE) +
   scale_fill_npg() +  
   scale_color_npg() +  
   labs(title = "", x = "Year", y = "Production (Tonnes)") +
   scale_x_continuous(breaks = seq(min(Data_long$Year), max(Data_long$Year), by = 3)) + 
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),          # Increase x-axis label size
-    axis.text.y = element_text(size = 14, face = "bold"),                                  # Increase y-axis label size
-    axis.title.x = element_text(size = 16, face = "bold"),                  # Increase x-axis title size and make bold
-    axis.title.y = element_text(size = 16, face = "bold"),                  # Increase y-axis title size and make bold
-    axis.line = element_line(size = 1),                                   # Make axis lines bolder
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+    axis.text.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.line = element_line(size = 1),
     panel.grid = element_blank(),
     legend.text = element_text(size = 14, face = "bold"),
     legend.title = element_text(size=16, face = "bold")
-  ) 
-#+ geom_vline(xintercept = "1996", linetype = "dotted", color = "black", size = 0.6)
-
+  )
 
 #Add regression line
 Data_total <- Data_long %>%
@@ -127,7 +140,6 @@ ggplot(Data_long, aes(x = Year, y = Tonnes, color = `Species/Product`, fill = `S
     legend.text = element_text(size = 16, face = "bold"),
     legend.title = element_text(size=16, face = "bold")
   ) 
-
 
 #Add regression formulas
 ggplot(Data_long, aes(x = Year, y = Tonnes, color = `Species/Product`, fill = `Species/Product`, group = `Species/Product`)) +
@@ -156,8 +168,6 @@ ggplot(Data_long, aes(x = Year, y = Tonnes, color = `Species/Product`, fill = `S
     legend.text = element_text(size = 14, face = "bold"),
     legend.title = element_text(size=16, face = "bold")
   ) 
-
-# Make sure Year is numeric (this is crucial!)
 
 ggplot(Data_long, aes(x = Year, y = Tonnes, color = `Species/Product`, fill = `Species/Product`, group = `Species/Product`)) +
   geom_line() +
@@ -190,9 +200,6 @@ ggplot(Data_long, aes(x = Year, y = Tonnes, color = `Species/Product`, fill = `S
 
 
 #Run model and test fit
-install.packages("gamm4")
-library(gamm4)
-
 
 Data_long$Product <- Data_long$`Species/Product`
 
@@ -424,14 +431,11 @@ ggplot(Data_long_time, aes(x = Year, y = Tonnes, color = `Species/Product`, fill
 
 #Linear trend may not be capturing data - does not look like a linear increase in production in later years (after 2010)
 #Try using a GAM to capture wiggles in data
-
-
 str(Data_long)
 Data_long$Year <- as.numeric(Data_long$Year)
 
 #Analyze each product seperately
 #Look at oysters
-
 
 Data_long$Product <- Data_long$`Species/Product`
 Data_long_oysters <- Data_long %>%
@@ -469,7 +473,6 @@ simulation_output <- simulateResiduals(model_gam)
 plot(simulation_output) #Fits now, so outliers causing deviations
 
 #Since outliers are true data points, will keep. 
-
 vis.gam(model_gam, 
         type = 'response', 
         plot.type = 'contour', 
